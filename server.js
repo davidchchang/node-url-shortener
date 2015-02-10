@@ -2,8 +2,9 @@ var http = require('http');
 var fs = require('fs');
 var assert = require('assert');
 var url = require('url');
+var qs = require('querystring');
 
-var _SLUG_CHARACTER_SET = function() {
+var _SLUG_CHARACTER_SET = function () {
   var characterSet = '';
   for (var i = 48; i <= 57; i++) {
     characterSet += String.fromCharCode(i);
@@ -45,20 +46,35 @@ function locateSlug(slug, callback) {
   }
   if (!slug) {
     callback(new Error('slug not valid'));
+    return;
   }
   slug = slug.replace(/\//g, '');
   if (!slug.match(/^[a-z0-9]+$/i)) {
     callback(new Error('slug not valid'));
+    return;
   }
 
   lookupSlugFile(slug, callback);
 }
 
+function findAvailableSlug(slug, urlToSlug, callback) {
+  fs.exists('./slugs/' + slug, function (exists) {
+    if (exists) {
+      slug += getRandomSlugCharacter();
+      findAvailableSlug(slug, urlToSlug, callback);
+    } else {
+      callback(null, slug, urlToSlug);
+    }
+  });
+}
+
+function getRandomSlugCharacter() {
+  var randomIndex = Math.floor(Math.random() * _SLUG_CHARACTER_SET.length);
+  return _SLUG_CHARACTER_SET.charAt(randomIndex);
+}
 /**
  * Generates a new slug for the passed URL which will consist of at least one or
  * more characters, where each character is either a letter or a number.
- *
- * This operation is atomic.
  *
  * @param urlToSlug string URL to convert to slug form
  * @param callback function callback function to invoke once the slug is generated or an error is encountered
@@ -69,33 +85,37 @@ function generateSlug(urlToSlug, callback) {
   }
   if (!urlToSlug) {
     callback(new Error('url missing'));
+    return;
   }
   var parsedUrl = url.parse(urlToSlug);
   if (!parsedUrl.hostname || !parsedUrl.protocol) {
     callback(new Error('not a valid url'));
+    return;
   }
 
   // find a slug that is available
-  var slug = '';
-  var randomIndex = Math.floor(Math.random() * _SLUG_CHARACTER_SET.length);
-  slug += _SLUG_CHARACTER_SET.charAt(randomIndex);
+  var slug = getRandomSlugCharacter(slug);
+  findAvailableSlug(slug, urlToSlug, function (err, newSlug, urlToSlug) {
+    fs.writeFile('./slugs/' + newSlug, urlToSlug, function (err) {
+      if (err) callback(err);
+      else {
+        callback(null, newSlug);
+      }
+      console.log(urlToSlug + ' -> ' + newSlug);
+    });
+  });
 
-  console.log(slug);
-
-  //fs.writeFile()
+  /**
+   * Rename is only guaranteed atomic operation on Linux/Unix kernel?
+   *
+   * http://stackoverflow.com/questions/17047994/transactionally-writing-files-in-node-js
+   * http://nodejs.org/api/fs.html#fs_fs_rename_oldpath_newpath_callback
+   */
 }
 
 
-//  short url needs to be expanded, and redirected
-// scenarios:
-// 1 - url is found, then redirect
-//  2- url not found, return 404
-
-// POST API - accept a POST /new operation to submit new URLs
-//  - if URL already exists, then return an error
-
 /**
- * Entry point for the application.
+ * Entry point for URL shortening application.
  */
 http.createServer(function (req, res) {
 
@@ -107,26 +127,39 @@ http.createServer(function (req, res) {
       res.end();
     }
     var body = '';
-    req.on('data', function (err, data) {
-      body += data.toString();
-    });
-    req.on('end', function (err) {
-      if (!error) {
-        generateSlug(body, function (err, response) {
+    // node doesn't follow convention here (first param is not error status)
+    req.on('data', function (data) {
+      body += data;
 
-        });
+      // Sanity check: kill the connection if we receive too much POST data
+      if (body.length > 1e6) {
+        req.connection.destroy();
       }
     });
-
-    generateSlug(req.param, function (error, response) {
-      if (!error) {
-        res.writeHead(201, {'Content-Type': 'text/plain'});
-        res.end();
-      } else {
-        res.writeHead(406, {'Content-Type': 'text/plain'});
-        res.end();
+    req.on('end', function () {
+        var post = qs.parse(body);
+        if (!post || !post['url']) {
+          // 400 Bad Request or 422 Unprocessable Entity are appropriate HTTP status codes here
+          res.writeHead(422, {});
+          res.end();
+        } else {
+          var urlToSlug = post['url'];
+          generateSlug(urlToSlug, function (error, newSlug) {
+            if (!error) {
+              res.writeHead(201, {'Content-Type': 'text/plain'});
+              res.write(JSON.stringify({
+                slug: newSlug,
+                url: urlToSlug
+              }));
+              res.end();
+            } else {
+              res.writeHead(406, {'Content-Type': 'text/plain'});
+              res.end();
+            }
+          });
+        }
       }
-    });
+    );
   } else {
     locateSlug(req.url, function (error, data) {
       if (!error) {
@@ -141,19 +174,23 @@ http.createServer(function (req, res) {
 
 }).listen(1337, '127.0.0.1');
 
+console.log('server running');
+
 // ===== UNIT TESTS ============================================================
+
+// TODO: switch to nodeunit - https://github.com/caolan/nodeunit
 
 // tests for locateSlug(str, fn)
 
 // happy path - matching slug found
 locateSlug('/s', function (error, data) {
   assert(error === null);
-  assert.equal('http://shopify.com', data);
+  assert.equal('http://www.shopify.com/', data);
 });
 // happy path - extra trailing slash should still match
 locateSlug('/s/', function (error, data) {
   assert(error === null);
-  assert.equal('http://shopify.com', data);
+  assert.equal('http://www.shopify.com/', data);
 });
 // callback undefined
 assert.throws(function () {
@@ -175,6 +212,25 @@ locateSlug('', function (error, data) {
 // tests for generateSlug(str, fn)
 
 // happy path - slug should be generated for valid URL
-generateSlug('http://www.google.com', function(error, data) {
-  assert(data, 'slug should be non-empty')
+generateSlug('http://www.google.com', function (error, data) {
+  assert(data, 'slug should be non-empty');
+});
+// missing callback should result in thrown error
+assert.throws(
+  function() {
+    generateSlug('http://www.google.com');
+  }, Error, 'callback missing'
+);
+assert.throws(
+  function() {
+    generateSlug();
+  }, Error, 'callback missing'
+);
+// blank url should result in error within callback
+generateSlug('', function (error, data) {
+  assert(error !== null);
+});
+// null url should result in error within callback
+generateSlug(null, function (error, data) {
+  assert(error !== null);
 });
