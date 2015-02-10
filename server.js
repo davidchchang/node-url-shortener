@@ -3,6 +3,20 @@ var fs = require('fs');
 var assert = require('assert');
 var url = require('url');
 
+var _SLUG_CHARACTER_SET = function() {
+  var characterSet = '';
+  for (var i = 48; i <= 57; i++) {
+    characterSet += String.fromCharCode(i);
+  }
+  for (i = 65; i <= 90; i++) {
+    characterSet += String.fromCharCode(i);
+  }
+  for (i = 97; i <= 122; i++) {
+    characterSet += String.fromCharCode(i);
+  }
+  return characterSet;
+}();
+
 /**
  * Helper function to extract a URL from a slug file, if it exists.
  *
@@ -63,19 +77,8 @@ function generateSlug(urlToSlug, callback) {
 
   // find a slug that is available
   var slug = '';
-  var characterSet = '';
-  for (var i = 48; i <= 57; i++) {
-    characterSet += String.fromCharCode(i);
-  }
-  for (i = 65; i <= 90; i++) {
-    characterSet += String.fromCharCode(i);
-  }
-  for (i = 97; i <= 122; i++) {
-    characterSet += String.fromCharCode(i);
-  }
-
-  var randomIndex = Math.floor(Math.random() * characterSet.length);
-  slug += characterSet.charAt(randomIndex);
+  var randomIndex = Math.floor(Math.random() * _SLUG_CHARACTER_SET.length);
+  slug += _SLUG_CHARACTER_SET.charAt(randomIndex);
 
   console.log(slug);
 
