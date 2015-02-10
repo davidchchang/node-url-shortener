@@ -32,7 +32,7 @@ function locateSlug(slug, callback) {
   if (!slug) {
     callback(new Error('slug not valid'));
   }
-  slug = slug.replace('/', '');
+  slug = slug.replace(/\//g, '');
   if (!slug.match(/^[a-z0-9]+$/i)) {
     callback(new Error('slug not valid'));
   }
@@ -103,7 +103,7 @@ http.createServer(function (req, res) {
       res.writeHead(400, {'Content-Type': 'text/plain'});
       res.end();
     }
-    var body = "";
+    var body = '';
     req.on('data', function (err, data) {
       body += data.toString();
     });
@@ -143,28 +143,35 @@ http.createServer(function (req, res) {
 // tests for locateSlug(str, fn)
 
 // happy path - matching slug found
-locateSlug("/s", function (error, data) {
-  assert.equal(null, error);
-  assert.equal("http://shopify.com", data);
+locateSlug('/s', function (error, data) {
+  assert(error === null);
+  assert.equal('http://shopify.com', data);
 });
 // happy path - extra trailing slash should still match
-locateSlug("/s/", function (error, data) {
-  assert.equal(null, error);
-  assert.equal("http://shopify.com", data);
+locateSlug('/s/', function (error, data) {
+  assert(error === null);
+  assert.equal('http://shopify.com', data);
 });
 // callback undefined
 assert.throws(function () {
-  locateSlug("/s", null);
+  locateSlug('/s', null);
 }, Error, 'callback not defined');
 // non-matching slug
-locateSlug("/1234", function (error, data) {
-  assert.notEqual(null, error);
+locateSlug('/1234', function (error, data) {
+  assert(error !== null);
 });
 // test for invalid characters in slug
-locateSlug("/s-", function (error, data) {
-  assert.notEqual(null, error);
+locateSlug('/s-', function (error, data) {
+  assert(error !== null);
 });
 // test for null/empty slug
-locateSlug("", function (error, data) {
-  assert.notEqual(null, error);
+locateSlug('', function (error, data) {
+  assert(error !== null);
+});
+
+// tests for generateSlug(str, fn)
+
+// happy path - slug should be generated for valid URL
+generateSlug('http://www.google.com', function(error, data) {
+  assert(data, 'slug should be non-empty')
 });
