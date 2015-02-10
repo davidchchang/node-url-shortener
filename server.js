@@ -3,19 +3,14 @@ var fs = require('fs');
 var assert = require('assert');
 var url = require('url');
 
-function locateSlug(filename, callback) {
-  if (!callback) {
-    throw new Error('callback not defined');
-  }
-  if (!filename) {
-    callback(new Error('slug not valid'));
-  }
-  filename = filename.replace('/', '');
-  if (!filename.match(/^[a-z0-9]+$/i)) {
-    callback(new Error('slug not valid'));
-  }
-
-  fs.readFile('./slugs/' + filename, function (err, data) {
+/**
+ * Helper function to extract a URL from a slug file, if it exists.
+ *
+ * @param slug string slug to lookup
+ * @param callback function callback function to invoke upon obtaining the slug contents or encountering an error
+ */
+function lookupSlugFile(slug, callback) {
+  fs.readFile('./slugs/' + slug, function (err, data) {
     if (err) {
       callback(err);
     }
@@ -24,14 +19,35 @@ function locateSlug(filename, callback) {
     }
   });
 }
+/**
+ * Locates a slugified URL as long as the slug exists.
+ *
+ * @param slug string slug to lookup
+ * @param callback function callback function to invoke once the URL is obtained or an error is encountered
+ */
+function locateSlug(slug, callback) {
+  if (!callback) {
+    throw new Error('callback not defined');
+  }
+  if (!slug) {
+    callback(new Error('slug not valid'));
+  }
+  slug = slug.replace('/', '');
+  if (!slug.match(/^[a-z0-9]+$/i)) {
+    callback(new Error('slug not valid'));
+  }
+
+  lookupSlugFile(slug, callback);
+}
 
 /**
- * convention:
- * letters, numbers;
- * start with 1 character, and grow by one character at a time until we get a miss
+ * Generates a new slug for the passed URL which will consist of at least one or
+ * more characters, where each character is either a letter or a number.
  *
- * @param urlToSlug
- * @param callback
+ * This operation is atomic.
+ *
+ * @param urlToSlug string URL to convert to slug form
+ * @param callback function callback function to invoke once the slug is generated or an error is encountered
  */
 function generateSlug(urlToSlug, callback) {
   if (!callback) {
@@ -72,7 +88,12 @@ function generateSlug(urlToSlug, callback) {
 // 1 - url is found, then redirect
 //  2- url not found, return 404
 
+// POST API - accept a POST /new operation to submit new URLs
+//  - if URL already exists, then return an error
 
+/**
+ * Entry point for the application.
+ */
 http.createServer(function (req, res) {
 
   console.log('Attempting to retrieve slug for: ' + req.url);
@@ -83,16 +104,18 @@ http.createServer(function (req, res) {
       res.end();
     }
     var body = "";
-    req.on('data', function(err,data) { body += data.toString(); });
+    req.on('data', function (err, data) {
+      body += data.toString();
+    });
     req.on('end', function (err) {
       if (!error) {
-        generateSlug(body, function(err, response) {
+        generateSlug(body, function (err, response) {
 
         });
       }
     });
 
-    generateSlug(req.param, function(error, response) {
+    generateSlug(req.param, function (error, response) {
       if (!error) {
         res.writeHead(201, {'Content-Type': 'text/plain'});
         res.end();
@@ -113,28 +136,35 @@ http.createServer(function (req, res) {
     });
   }
 
-// POST API - accept a POST /new operation to submit new URLs
-//  - if URL already exists, then return an error
 }).listen(1337, '127.0.0.1');
 
-// http://localhost:1337/foo/bar - 404
+// ===== UNIT TESTS ============================================================
 
+// tests for locateSlug(str, fn)
 
+// happy path - matching slug found
 locateSlug("/s", function (error, data) {
   assert.equal(null, error);
   assert.equal("http://shopify.com", data);
 });
-assert.throws(function() {locateSlug('/s', null); }, Error, 'callback not defined');
+// happy path - extra trailing slash should still match
+locateSlug("/s/", function (error, data) {
+  assert.equal(null, error);
+  assert.equal("http://shopify.com", data);
+});
+// callback undefined
+assert.throws(function () {
+  locateSlug("/s", null);
+}, Error, 'callback not defined');
+// non-matching slug
 locateSlug("/1234", function (error, data) {
   assert.notEqual(null, error);
 });
+// test for invalid characters in slug
 locateSlug("/s-", function (error, data) {
   assert.notEqual(null, error);
 });
-locateSlug('', function (error, data) {
+// test for null/empty slug
+locateSlug("", function (error, data) {
   assert.notEqual(null, error);
 });
-locateSlug('', function (error, data) {
-  assert.notEqual(null, error);
-});
-
