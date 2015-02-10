@@ -5,18 +5,20 @@ var url = require('url');
 var qs = require('querystring');
 
 var _SLUG_CHARACTER_SET = function () {
-  var characterSet = '';
-  for (var i = 48; i <= 57; i++) {
-    characterSet += String.fromCharCode(i);
-  }
-  for (i = 65; i <= 90; i++) {
-    characterSet += String.fromCharCode(i);
-  }
-  for (i = 97; i <= 122; i++) {
-    characterSet += String.fromCharCode(i);
-  }
-  return characterSet;
-}();
+    var characterSet = '';
+    for (var i = 48; i <= 57; i++) {
+      characterSet += String.fromCharCode(i);
+    }
+    for (i = 65; i <= 90; i++) {
+      characterSet += String.fromCharCode(i);
+    }
+    for (i = 97; i <= 122; i++) {
+      characterSet += String.fromCharCode(i);
+    }
+    return characterSet;
+  }(),
+  _SERVER_HOSTNAME = '127.0.0.1',
+  _SERVER_PORT = 1337;
 
 /**
  * Helper function to extract a URL from a slug file, if it exists.
@@ -184,9 +186,9 @@ http.createServer(function (req, res) {
     });
   }
 
-}).listen(1337, '127.0.0.1');
+}).listen(_SERVER_PORT, _SERVER_HOSTNAME);
 
-console.log('server running');
+console.log('Server running at http://' + _SERVER_HOSTNAME + ':' + _SERVER_PORT + '/');
 
 // ===== UNIT TESTS ============================================================
 
