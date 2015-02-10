@@ -21,8 +21,8 @@ var _SLUG_CHARACTER_SET = function () {
 /**
  * Helper function to extract a URL from a slug file, if it exists.
  *
- * @param slug string slug to lookup
- * @param callback function callback function to invoke upon obtaining the slug contents or encountering an error
+ * @param {string} slug slug to lookup
+ * @param {function} callback function to invoke upon obtaining the slug contents or encountering an error
  */
 function lookupSlugFile(slug, callback) {
   fs.readFile('./slugs/' + slug, function (err, data) {
@@ -37,8 +37,8 @@ function lookupSlugFile(slug, callback) {
 /**
  * Locates a slugified URL as long as the slug exists.
  *
- * @param slug string slug to lookup
- * @param callback function callback function to invoke once the URL is obtained or an error is encountered
+ * @param {string} slug slug to lookup
+ * @param {function} callback function to invoke once the URL is obtained or an error is encountered
  */
 function locateSlug(slug, callback) {
   if (!callback) {
@@ -57,6 +57,13 @@ function locateSlug(slug, callback) {
   lookupSlugFile(slug, callback);
 }
 
+/**
+ * Recursive function to find the next available slug. W
+ *
+ * @param {string} slug the current slug to check for existence or to write to
+ * @param {string} urlToSlug the URL contents of target slug file
+ * @param {function} callback the callback function to execute when an available slug is found
+ */
 function findAvailableSlug(slug, urlToSlug, callback) {
   fs.exists('./slugs/' + slug, function (exists) {
     if (exists) {
@@ -68,6 +75,11 @@ function findAvailableSlug(slug, urlToSlug, callback) {
   });
 }
 
+/**
+ * Fetches a random character from the slug character set.
+ *
+ * @returns {string} a random character from the slug character set
+ */
 function getRandomSlugCharacter() {
   var randomIndex = Math.floor(Math.random() * _SLUG_CHARACTER_SET.length);
   return _SLUG_CHARACTER_SET.charAt(randomIndex);
@@ -76,8 +88,8 @@ function getRandomSlugCharacter() {
  * Generates a new slug for the passed URL which will consist of at least one or
  * more characters, where each character is either a letter or a number.
  *
- * @param urlToSlug string URL to convert to slug form
- * @param callback function callback function to invoke once the slug is generated or an error is encountered
+ * @param {string} urlToSlug URL to convert to slug form
+ * @param {function} callback function to invoke once the slug is generated or an error is encountered
  */
 function generateSlug(urlToSlug, callback) {
   if (!callback) {
